@@ -49,6 +49,12 @@ describe('Contoso API', () => {
     assert.equal(statement.currentYearAccrual, 602.96);
   });
 
+  test('GET /api/members/:id/statement applies the part-time factor', async () => {
+    const statement = await (await api.get('/api/members/M-1003/statement')).json();
+    assert.equal(statement.currentPensionableSalary, 17_073);
+    assert.equal(statement.currentYearAccrual, 298.78);
+  });
+
   test('POST /api/projections projects at the standard retirement age', async () => {
     const res = await api.post('/api/projections', { memberId: 'M-1001' });
     assert.equal(res.status, 200);
