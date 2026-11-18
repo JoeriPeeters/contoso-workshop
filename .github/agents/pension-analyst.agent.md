@@ -1,6 +1,7 @@
 ---
 name: Pension Analyst
 description: Researches Contoso business rules, code and tests for one backlog item and returns a memo with files, rules and test cases. Read-only. Used as a subagent by the Feature Lead.
+model: ['chatgpt-sol']
 tools: ['read', 'search']
 user-invocable: false
 ---
