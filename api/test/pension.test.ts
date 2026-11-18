@@ -42,12 +42,65 @@ test('projection at the standard retirement age adds future accrual', () => {
   });
   assert.equal(result.yearsToRetirement, 14);
   assert.equal(result.futureAccrual, 8_441.44);
+  assert.equal(result.earlyRetirementReduction, 0);
+  assert.equal(result.unreducedAnnualPension, 13_441.44);
   assert.equal(result.projectedAnnualPension, 13_441.44);
   assert.equal(result.retirementDate, '2040-04-15');
 });
 
-test('projection rejects early retirement (not supported yet)', () => {
+test('projection accepts retirement age 60 (lowest valid bound)', () => {
+  const result = projectPension({
+    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 0, asOf: '2026-11-18', retirementAge: 60,
+  });
+  assert.equal(result.retirementAge, 60);
+  assert.equal(result.earlyRetirementReduction, 0.52);
+});
+
+test('projection at age 68 has no reduction and unreduced equals projected', () => {
+  const result = projectPension({
+    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 5_000, asOf: '2026-11-18', retirementAge: 68,
+  });
+  assert.equal(result.earlyRetirementReduction, 0);
+  assert.equal(result.unreducedAnnualPension, result.projectedAnnualPension);
+});
+
+test('projection rejects retirement age 59', () => {
   assert.throws(() => projectPension({
-    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 0, asOf: '2026-11-18', retirementAge: 63,
-  }), /early retirement is not supported/);
+    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 0, asOf: '2026-11-18', retirementAge: 59,
+  }), RangeError);
+});
+
+test('projection rejects retirement age 69', () => {
+  assert.throws(() => projectPension({
+    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 0, asOf: '2026-11-18', retirementAge: 69,
+  }), RangeError);
+});
+
+test('projection rejects retirement age below current age', () => {
+  assert.throws(() => projectPension({
+    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 0, asOf: '2026-11-18', retirementAge: 53,
+  }), RangeError);
+});
+
+test('M-1004 at age 63 on 2026-11-18 has deterministic reduction 0.325', () => {
+  const result = projectPension({
+    birthDate: '1966-06-30',
+    fullTimeSalary: 98_000,
+    partTimeFactor: 0.8,
+    accruedToDate: 12_000,
+    asOf: '2026-11-18',
+    retirementAge: 63,
+  });
+  assert.equal(result.earlyRetirementReduction, 0.325);
+});
+
+test('early retirement shortens future accrual horizon versus age 68', () => {
+  const early = projectPension({
+    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 5_000, asOf: '2026-11-18', retirementAge: 63,
+  });
+  const standard = projectPension({
+    birthDate: '1972-04-15', fullTimeSalary: 52_000, partTimeFactor: 1, accruedToDate: 5_000, asOf: '2026-11-18', retirementAge: 68,
+  });
+  assert.ok(early.yearsToRetirement < standard.yearsToRetirement);
+  assert.ok(early.futureAccrual < standard.futureAccrual);
 });
