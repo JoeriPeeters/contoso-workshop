@@ -29,7 +29,7 @@ export class StatementService {
     const history = this.contributions.listByMember(member.id);
     const accruedPension = roundMoney(this.contributions.totalAccrual(member.id));
 
-    const currentPensionable = pensionableSalary(member.fullTimeSalary, 1);
+    const currentPensionable = pensionableSalary(member.fullTimeSalary, member.partTimeFactor);
     const currentYearAccrual = annualAccrual(currentPensionable);
 
     const projection = projectPension({
