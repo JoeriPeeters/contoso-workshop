@@ -1,78 +1,51 @@
 # Model scorecard — rule R1 (pensionableSalary)
 
+> 🧪 **EXAMPLE — filled in by the workshop team for illustration.** Your own scorecard will differ: other models, other edge cases, other verdict.
 > One run is a sample, not a benchmark. Synthetic data only — never paste secrets or real member data.
 
-| | Model A | Model B | Model C |
-|---|---|---|---|
-| Model (name as shown in the picker) | Sol | Sonnet | (fill in) |
-| Harness · Mode · Permissions | Copilot · Interactive · Manual | Copilot · Interactive · Manual | (fill in) |
-| Reasoning effort | | | |
-| Date | | | |
+| | Model A | Model B |
+|---|---|---|
+| Model (name as shown in the picker) | *a fast, lightweight model* (example) | *a deep-reasoning model* (example) |
+| Harness · Mode · Permissions | Copilot · Interactive · Manual | Copilot · Interactive · Manual |
+| Reasoning effort | | |
+| Date | 2026-11-18 | 2026-11-18 |
+
+## What each model proposed (example)
+
+| # | Input (salary, factor) | Model A expected | Model B expected | Real output (`node -e`) | A | B |
+|---|---|---|---|---|---|---|
+| 1 | 17545, 1 (exactly the franchise) | 0 | 0 | `0` | ✅ | ✅ |
+| 2 | 137801, 1 (just above the cap) | 120256 | 120255 | `120255` | ❌ | ✅ |
+| 3 | 46000, 0.6 (part-time) | 17073 | 17073 | `17073` | ✅ | ✅ |
+| 4 | 16000, 0.9 (below franchise) | -1390.5 | 0 | `0` | ❌ | ✅ |
+| 5 (A) | 100000, 0.5 | 41227.5 | — | `41227.5` | ✅ | |
+| 5 (B) | 50000, 0 (invalid factor) | — | throws RangeError | `RangeError: partTimeFactor must be greater than 0 and at most 1` | | ✅ |
 
 ## Scores
 
-| Criterion | How to score | Model A | Model B | Model C |
-|---|---|---|---|---|
-| Correctness verified | Expected values that match the `node -e` output (x / 5) | 5/5 | 5/5 | 5/5 |
-| Edge cases found | Which did it cover? franchise boundary · salary cap · part-time · below franchise → 0 · invalid factor (0 or > 1) · negative salary | franchise boundary, salary cap, part-time, invalid factor, negative salary (missed: below franchise) | franchise boundary, salary cap, part-time, invalid factor, negative salary (missed: below franchise) | franchise boundary, below franchise → 0 (salary 0), cap boundary (exactly 137800), invalid factor 0 (missed: salary above cap, negative salary, factor > 1) |
-| Hallucinations | Invented functions, parameters, files or rules? List them (none = 👍) | none in recorded outputs | none in recorded outputs | none in recorded outputs |
-| Latency feel | fast / ok / slow | | | |
-| Cost / credits | Relative cost of the model (supported-models doc) — heavier model = more AI credits | | | |
+| Criterion | How to score | Model A | Model B |
+|---|---|---|---|
+| Correctness verified | Expected values that match the `node -e` output (x / 5) | 3/5 | 5/5 |
+| Edge cases found | Which did it cover? franchise boundary · salary cap · part-time · below franchise → 0 · invalid factor (0 or > 1) · negative salary | franchise, cap, part-time, below franchise (missed: invalid factor, negative salary) | franchise, cap, part-time, below franchise, invalid factor (missed: negative salary) |
+| Hallucinations | Invented functions, parameters, files or rules? List them (none = 👍) | Ignored the "never below 0" clamp (-1390.5); used the uncapped salary for #2 | none 👍 |
+| Latency feel | fast / ok / slow | fast | slow |
+| Cost / credits | Relative cost of the model (supported-models doc) — heavier model = more AI credits | low | high |
 
-## Model outputs (verified against `pensionableSalary`)
-
-### Model A — Sol
+## Verification output
 
 ```text
-17545 1 0
-137800 0.5 60127.5
-137801 1 120255
--1 1 RangeError: fullTimeSalary must be a non-negative number
-50000 0 RangeError: partTimeFactor must be greater than 0 and at most 1
-```
-
-### Model B — Sonnet
-
-```text
+$ node -e "import('./api/src/domain/pension.ts').then(m=>{for (const [s,f] of [[17545,1],[137801,1],[46000,0.6],[16000,0.9],[100000,0.5],[50000,0]]) {try{console.log(s,f,m.pensionableSalary(s,f))}catch(e){console.log(s,f,e.name+': '+e.message)}}})"
 17545 1 0
 137801 1 120255
-50000 0.333 10807.52
+46000 0.6 17073
+16000 0.9 0
+100000 0.5 41227.5
 50000 0 RangeError: partTimeFactor must be greater than 0 and at most 1
--1 1 RangeError: fullTimeSalary must be a non-negative number
-```
-
-### Model C MAI Code
-
-```text
-0 0.5 0
-17545 1 0
-17545.01 1 0.01
-137800 1 120255
-100000 0 RangeError: partTimeFactor must be greater than 0 and at most 1
 ```
 
 ## Verdict
 
-### Edge-case coverage
-
-| Category | A (Sol) | B (Sonnet) | C |
-|---|---|---|---|
-| Franchise boundary | ✅ | ✅ | ✅ |
-| Salary cap | ✅ (137800 and 137801) | ✅ (137801) | ⚠️ only exactly 137800, so the cap never clips |
-| Part-time | ✅ (0.5) | ✅ (0.333, with rounding) | ⚠️ 0.5 only, on a salary of 0 |
-| Below franchise → 0 | ❌ | ❌ | ✅ (salary 0) |
-| Invalid factor | ✅ (0) | ✅ (0) | ✅ (0) |
-| Negative salary | ✅ | ✅ | ❌ |
-| **Covered** | 5/6 | 5/6 | 4/6 |
-
-- A and B are tied at 5/6; both missed "below franchise".
-- C is behind at 4/6, but it is the only one that tested below the franchise, and it found the sharpest rounding boundary (`17545.01 → 0.01`).
-- No model covered everything: nobody tested a factor above 1. The union of A + C covers all 6 categories.
-- Conclusion: no single model's edge cases are complete. Combine outputs or explicitly prompt for the missing categories.
-
-### Decision
-
-- For **this kind of task** I would use: **any of the three**; this run does not clearly distinguish them. Sol or Sonnet for broader coverage.
-- Because: all three produced 5/5 correct values. Sol tested the cap exactly and a half-time factor; Sonnet tested fractional-cent rounding; C tested the franchise floor and a one-cent boundary.
-- Would I trust it **without** the `node -e` check? **No** — exact values and error messages need to be checked against the function.
-- To make this a real benchmark I would need: the same scoring criteria across 10+ tasks, 3+ runs per model, and measured latency and credit usage.
+- For **this kind of task** (finding edge cases in a business rule) I would use: **Model B** (deep reasoning).
+- Because: all 5 values were correct and it found the invalid-input case; Model A was faster and cheaper but got 2 of 5 wrong.
+- Would I trust it **without** the `node -e` check? **No** — even Model B missed the negative-salary case; only running the real code proves the values.
+- To make this a real benchmark I would need: 10+ tasks, 3+ runs per model, the same scoring rule, and the credit usage per run.
